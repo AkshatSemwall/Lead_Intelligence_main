@@ -6,6 +6,8 @@ from __future__ import annotations
 import json
 import logging
 
+from backend.models import state
+from backend.models import state
 from backend.models.state import WorkflowState, BusinessAnalysisData
 from backend.prompts.templates import business_analysis_prompt
 from backend.services.gemini_client import get_llm_client
@@ -20,6 +22,7 @@ async def business_analysis_node(state: WorkflowState) -> WorkflowState:
     log_entries.append(make_log_entry("business_analysis", "started", "Starting business analysis"))
 
     company = state.get("lead_company", "")
+    lead_message = state.get("lead_message", "")
     research = state.get("research") or {}
     web_content = research.get("raw_web_content", "")
 
@@ -29,7 +32,7 @@ async def business_analysis_node(state: WorkflowState) -> WorkflowState:
             {k: v for k, v in research.items() if k != "raw_web_content"},
             indent=2,
         )
-        prompt = business_analysis_prompt(company, research_text, web_content)
+        prompt = business_analysis_prompt(company, research_text, web_content,lead_message)
         raw = await llm.generate(prompt, temperature=0.2)
 
         data_dict = extract_json(raw)

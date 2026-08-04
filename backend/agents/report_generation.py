@@ -129,6 +129,7 @@ async def report_generation_node(state: WorkflowState) -> WorkflowState:
     lead_name = state.get("lead_name", "")
     company = state.get("lead_company", "")
     website = state.get("lead_website", "")
+    lead_message = state.get("lead_message", "")
     research = state.get("research") or {}
     analysis = state.get("analysis") or {}
     insights = state.get("insights") or {}
@@ -150,6 +151,7 @@ async def report_generation_node(state: WorkflowState) -> WorkflowState:
             research_data=research_text,
             analysis_data=analysis_text,
             insight_data=insights_text,
+            lead_message=lead_message,
         )
 
         # Use higher temperature for more natural prose

@@ -74,10 +74,14 @@ export default function ReportPage() {
             </a>
           )}
           {report?.pdf_url && (
-            <a href={report.pdf_url} download className="btn-primary text-sm gap-2">
-              <Download size={15} /> Download PDF
-            </a>
-          )}
+  <a
+    href={getPdfUrl(workflowId)}
+    download
+    className="btn-primary text-sm gap-2"
+  >
+    <Download size={15} /> Download PDF
+  </a>
+)}
         </div>
       </div>
 

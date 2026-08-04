@@ -4,13 +4,13 @@ Converts Markdown → HTML → PDF with a professional consulting style.
 """
 from __future__ import annotations
 
+import html
 import logging
 import os
 import tempfile
 import uuid
 from datetime import datetime
 from pathlib import Path
-
 logger = logging.getLogger(__name__)
 
 # Output directory for generated PDFs
@@ -42,6 +42,13 @@ REPORT_CSS = """
     }
 }
 
+@page cover {
+    size: A4;
+    margin: 0;
+    @top-right { content: none; }
+    @bottom-center { content: none; }
+}
+
 body {
     font-family: Inter, -apple-system, BlinkMacSystemFont, sans-serif;
     font-size: 10.5pt;
@@ -52,6 +59,7 @@ body {
 
 /* Cover page */
 .cover-page {
+    page: cover;
     page-break-after: always;
     min-height: 25cm;
     display: flex;
@@ -244,13 +252,16 @@ def _markdown_to_html(markdown_text: str, company_name: str, lead_name: str) -> 
         extensions=["extra", "tables", "toc", "fenced_code"],
     )
 
+    safe_company = html.escape(company_name)
+    safe_lead = html.escape(lead_name)
+
     cover_html = f"""
     <div class="cover-page">
         <div class="cover-logo">Lead Intelligence</div>
         <div class="cover-title">Business Audit Report</div>
-        <div class="cover-subtitle">{company_name}</div>
+        <div class="cover-subtitle">{safe_company}</div>
         <div class="cover-meta">
-            <span>Prepared for: {lead_name}</span>
+            <span>Prepared for: {safe_lead}</span>
             <span>Generated: {datetime.now().strftime('%B %d, %Y')}</span>
             <span>Confidential — For Recipient Use Only</span>
         </div>
@@ -262,7 +273,7 @@ def _markdown_to_html(markdown_text: str, company_name: str, lead_name: str) -> 
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Business Audit Report — {company_name}</title>
+    <title>Business Audit Report — {safe_company}</title>
     <style>{REPORT_CSS}</style>
 </head>
 <body>
@@ -298,7 +309,7 @@ async def generate_pdf(
     try:
         from weasyprint import HTML  # type: ignore
 
-        loop = asyncio.get_event_loop()
+        loop = asyncio.get_running_loop()
         await loop.run_in_executor(
             None,
             functools.partial(
@@ -308,27 +319,36 @@ async def generate_pdf(
         )
     except Exception as exc:
         logger.warning("WeasyPrint failed, using reportlab fallback: %s", exc)
+        import re
+        from xml.sax.saxutils import escape as xml_escape
         from reportlab.lib.pagesizes import A4
         from reportlab.lib.styles import ParagraphStyle, getSampleStyleSheet
         from reportlab.lib.units import inch
         from reportlab.platypus import Paragraph, SimpleDocTemplate, Spacer, Table, TableStyle
         from reportlab.lib import colors
 
+        def _inline_markdown_to_reportlab(text: str) -> str:
+            """Escape text for ReportLab's mini-markup, then re-apply bold/italic."""
+            escaped = xml_escape(text)
+            escaped = re.sub(r"\*\*(.+?)\*\*", r"<b>\1</b>", escaped)
+            escaped = re.sub(r"(?<!\*)\*([^*]+?)\*(?!\*)", r"<i>\1</i>", escaped)
+            return escaped
+
         doc = SimpleDocTemplate(output_path, pagesize=A4, rightMargin=0.75 * inch, leftMargin=0.75 * inch, topMargin=0.75 * inch, bottomMargin=0.75 * inch)
         styles = getSampleStyleSheet()
         body = []
-        body.append(Paragraph(f"Business Audit Report — {company_name}", styles["Title"]))
-        body.append(Paragraph(f"Prepared for {lead_name}", styles["Heading2"]))
+        body.append(Paragraph(f"Business Audit Report — {xml_escape(company_name)}", styles["Title"]))
+        body.append(Paragraph(f"Prepared for {xml_escape(lead_name)}", styles["Heading2"]))
         body.append(Spacer(1, 0.25 * inch))
         for line in markdown_content.splitlines():
             if line.startswith("# "):
-                body.append(Paragraph(line[2:], styles["Heading1"]))
+                body.append(Paragraph(_inline_markdown_to_reportlab(line[2:]), styles["Heading1"]))
             elif line.startswith("## "):
-                body.append(Paragraph(line[3:], styles["Heading2"]))
-            elif line.startswith("- "):
-                body.append(Paragraph(line[2:], styles["BodyText"]))
+                body.append(Paragraph(_inline_markdown_to_reportlab(line[3:]), styles["Heading2"]))
+            elif line.startswith(("- ", "* ")):
+                body.append(Paragraph("• " + _inline_markdown_to_reportlab(line[2:]), styles["BodyText"]))
             else:
-                body.append(Paragraph(line or " ", styles["BodyText"]))
+                body.append(Paragraph(_inline_markdown_to_reportlab(line) or " ", styles["BodyText"]))
             body.append(Spacer(1, 0.1 * inch))
         doc.build(body)
 

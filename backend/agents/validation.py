@@ -88,7 +88,9 @@ async def validation_node(state: WorkflowState) -> WorkflowState:
     log_entries.append(make_log_entry("validation", "completed" if is_valid else "failed", status_msg))
 
     nodes_completed = list(state.get("nodes_completed", []))
-    if is_valid:
+    if "orchestrator" not in nodes_completed:
+        nodes_completed.append("orchestrator")
+    if is_valid and "validation" not in nodes_completed:
         nodes_completed.append("validation")
 
     return {

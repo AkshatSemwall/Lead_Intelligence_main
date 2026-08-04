@@ -21,6 +21,7 @@ async def insight_generation_node(state: WorkflowState) -> WorkflowState:
 
     company = state.get("lead_company", "")
     website = state.get("lead_website", "")
+    lead_message = state.get("lead_message", "")
     research = state.get("research") or {}
     analysis = state.get("analysis") or {}
     web_content = research.get("raw_web_content", "")
@@ -28,7 +29,7 @@ async def insight_generation_node(state: WorkflowState) -> WorkflowState:
     try:
         llm = get_llm_client()
         analysis_text = json.dumps(analysis, indent=2)
-        prompt = insight_generation_prompt(company, website, web_content, analysis_text)
+        prompt = insight_generation_prompt(company, website, web_content, analysis_text, lead_message)
         raw = await llm.generate(prompt, temperature=0.3)
 
         data_dict = extract_json(raw)
