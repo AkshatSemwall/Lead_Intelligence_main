@@ -1,0 +1,335 @@
+You are working on an existing production-style project called:
+
+Lead Intelligence — Autonomous Multi-Agent System
+
+DO NOT redesign the architecture.
+DO NOT rewrite agents.
+DO NOT replace LangGraph.
+DO NOT replace the current LLM abstraction.
+
+Your task is ONLY to make the LLM layer more reliable.
+
+PROJECT CONTEXT:
+
+The project is a LangGraph + FastAPI + React autonomous multi-agent system.
+
+Workflow:
+
+Lead Form
+↓
+Orchestrator Agent
+↓
+Validation Agent
+↓
+Company Research Agent
+↓
+Business Analysis Agent
+↓
+Insight Generation Agent
+↓
+Report Generation Agent
+↓
+PDF Generation Agent
+↓
+Email Agent
+↓
+Google Sheets Agent
+↓
+Google Drive Agent
+
+
+There are around 10-11 agents.
+
+All agents already use:
+
+backend.services.gemini_client.get_llm_client()
+
+Example:
+
+llm = get_llm_client()
+
+response = await llm.generate(prompt)
+
+Therefore DO NOT modify individual agents.
+
+The current abstraction is correct.
+
+OBJECTIVE:
+
+Keep Gemini as the primary LLM provider.
+
+Add Groq as an automatic fallback when Gemini fails.
+
+Reason:
+
+Gemini may fail because of:
+- quota limits
+- billing restrictions
+- unavailable models
+- API errors
+
+Groq should provide a free working fallback for prototype/demo usage.
+
+
+EXPECTED FLOW:
+
+Every LLM request should behave like this:
+
+
+Agent calls:
+
+llm.generate(prompt)
+
+
+↓
+
+LLMClient attempts Gemini
+
+
+↓
+
+If Gemini succeeds:
+
+return Gemini response
+
+
+↓
+
+If Gemini throws any exception:
+
+log the failure
+
+automatically attempt Groq
+
+
+↓
+
+If Groq succeeds:
+
+return Groq response
+
+
+↓
+
+If both fail:
+
+use existing deterministic fallback response
+
+
+DO NOT remove existing fallback logic.
+
+
+FILES ALLOWED TO MODIFY:
+
+1. backend/services/gemini_client.py
+
+2. backend/config.py
+
+3. requirements.txt
+
+4. .env.example
+
+
+DO NOT MODIFY:
+
+- backend/agents/*
+- backend/graph/workflow.py
+- frontend/*
+- PDF generation
+- Gmail integration
+- Google Sheets integration
+- Google Drive integration
+
+
+IMPLEMENTATION REQUIREMENTS:
+
+
+1. Add Groq configuration.
+
+
+In config.py add:
+
+groq_api_key: str = ""
+
+groq_model:
+default:
+
+llama-3.3-70b-versatile
+
+
+Extend validation if required.
+
+
+2. Update requirements.txt
+
+Add:
+
+groq>=0.9.0
+
+
+Do not add unnecessary LangChain dependencies.
+
+The project uses LangGraph and a custom LLM wrapper.
+
+
+3. Update .env.example
+
+Add:
+
+GROQ_API_KEY=your_groq_api_key_here
+
+GROQ_MODEL=llama-3.3-70b-versatile
+
+
+Keep existing Gemini variables.
+
+
+4. Modify LLMClient.
+
+
+Current behavior:
+
+Gemini only.
+
+
+New behavior:
+
+
+_initialize Groq client:
+
+
+from groq import AsyncGroq
+
+
+self.groq_client = AsyncGroq(
+    api_key=settings.groq_api_key
+)
+
+
+When generate() is called:
+
+
+TRY GEMINI FIRST
+
+Existing Gemini logic remains.
+
+
+If Gemini fails:
+
+catch exception
+
+logger.warning(
+"Gemini failed, switching to Groq fallback"
+)
+
+
+Then call:
+
+
+await groq_client.chat.completions.create(
+    model=settings.groq_model,
+    messages=[
+       {
+        "role":"user",
+        "content":prompt
+       }
+    ],
+    temperature=temperature
+)
+
+
+Return:
+
+response.choices[0].message.content
+
+
+5. Preserve current fallback responses.
+
+The existing:
+
+_fallback_response()
+
+must remain.
+
+
+The priority order should be:
+
+
+1. Gemini
+
+2. Groq
+
+3. deterministic fallback
+
+
+6. Add proper logging.
+
+Example:
+
+
+Gemini success:
+
+"Gemini generation successful"
+
+
+Gemini failure:
+
+"Gemini failed: <error>. Trying Groq fallback"
+
+
+Groq success:
+
+"Groq fallback successful"
+
+
+Groq failure:
+
+"Groq failed. Using deterministic fallback"
+
+
+7. Testing requirements:
+
+
+After implementation verify:
+
+
+- Application starts successfully
+- LangGraph workflow compiles
+- Business Analysis Agent works
+- Report Generation Agent works
+- PDF generation still works
+- No agent imports changed
+- No frontend changes
+
+
+Run:
+
+pytest -q
+
+
+Test manually:
+
+Submit a lead.
+
+Verify:
+
+Validation Agent
+Company Research Agent
+Business Analysis Agent
+Insight Generation Agent
+Report Generation Agent
+
+all complete.
+
+
+IMPORTANT:
+
+This is NOT a migration from Gemini to Groq.
+
+This is adding a resilience layer.
+
+Gemini stays primary.
+
+Groq is only a backup provider.
+
+Make the smallest possible code changes.
