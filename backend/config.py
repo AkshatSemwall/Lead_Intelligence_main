@@ -28,7 +28,7 @@ class Settings(BaseSettings):
 
     # ── Groq (fallback provider) ──────────────────────────────────────────
     groq_api_key: str = ""
-    groq_model: str = "llama-3.3-70b-versatile"
+    groq_model: str = "openai/gpt-oss-20b"
 
     # ── Research ─────────────────────────────────────────────────────────
     tavily_api_key: str = ""
